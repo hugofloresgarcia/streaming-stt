@@ -7,7 +7,7 @@ This is a simple streaming STT service using the Google Cloud Speech API.
 
 You'll need to set up a Google Cloud project and enable the Speech API. Then, you'll need to create a service account and download the JSON key file. Finally, you'll need to set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the path of the JSON key file. 
 
-Follow the instructions [here](https://cloud.google.com/speech-to-text/docs/before-you-begin) to set up your project and service account.
+Follow the instructions here (https://cloud.google.com/speech-to-text/docs/before-you-begin) to set up your project and service account.
 
 From this directory, you can store the credentials in a file called creds.json and run the following command:
 
