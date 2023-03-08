@@ -33,3 +33,10 @@ To view the streaming STT service output in real time, run:
 ```bash
 watch -n 0.1 tail -n 10 speech.txt
 ```
+
+### Sound Classification
+
+To run sound classification with yamnet and stream the output to a file, run:
+```bash
+python yamnet.py --output_file sound.txt
+```

@@ -77,7 +77,7 @@ def yamnet_infer(output_file: str = "sounds.txt"):
 if __name__ == "__main__":
     import argbind
 
-    argbind.bind(yamnet_infer)
+    argbind.bind(yamnet_infer, without_prefix=True)
 
     args = argbind.parse_args()
 
