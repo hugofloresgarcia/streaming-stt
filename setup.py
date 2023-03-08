@@ -9,5 +9,9 @@ setup(
         "pyaudio",
         "google-cloud-speech",
         "google-cloud-storage",
+        "tensorflow", 
+        "tensorflow_hub",
+        "numpy",
+        "argbind"
     ]
 )
