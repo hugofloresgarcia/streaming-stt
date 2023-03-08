@@ -8,7 +8,7 @@ import tensorflow_hub as hub
 import pyaudio
 
 SAMPLE_RATE = 16000
-CHUNKSIZE = int(SAMPLE_RATE * 1.09) # fixed chunk size
+CHUNKSIZE = int(SAMPLE_RATE * 1.8) # fixed chunk size
 
 
 # Find the name of the class with the top score when mean-aggregated across frames.
@@ -48,20 +48,23 @@ def yamnet_infer(output_file: str = "sounds.txt"):
                 # do this as long as you want fresh samples
                 # TODO: put samples in a queue and process them in a separate thread
                 # to avoid buffer overflows
-                data = stream.read(CHUNKSIZE, exception_on_overflow = False)
+                data = stream.read(CHUNKSIZE, exception_on_overflow=False)
                 waveform = np.frombuffer(data, dtype=np.int16).astype(np.float32)
                 waveform = waveform / np.iinfo(np.int16).max
 
                 # Run the model, check the output.
                 scores, embeddings, spectrogram = model(waveform)
 
-                scores_np = scores.numpy()
-                spectrogram_np = spectrogram.numpy()
-                infered_class = class_names[scores_np.mean(axis=0).argmax()]
+                scores = scores.numpy()
+                spectrogram = spectrogram.numpy()
+                infered_class = class_names[scores.mean(axis=0).argmax()]
+
+                top_classes = np.argsort(scores.mean(axis=0))[::-1]
+                top = "\t|\t".join(f"{class_names[i]:<15}" for i in top_classes[:5])
                 
-                f.write(f"{time.time()-start_time},{infered_class}\n")
+                f.write(f"{time.time()-start_time},{top}\n")
                 f.flush()
-                print(f"{time.time()-start_time},{infered_class}")
+                print(f"{time.time()-start_time:<3.3f},{top}")
 
 
         except KeyboardInterrupt:
