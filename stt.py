@@ -159,7 +159,10 @@ class ResumableMicrophoneStream:
             yield b"".join(data)
 
 
-def listen_print_loop(responses, stream, start_pos, f):
+
+from collections import defaultdict
+keyword_counts = defaultdict(lambda: 0)
+def listen_print_loop(responses, stream, start_pos, out_file, keyword_file, keywords):
     """Iterates through server responses and prints them.
     The responses passed is a generator that will block until a response
     is provided by the server.
@@ -171,9 +174,11 @@ def listen_print_loop(responses, stream, start_pos, f):
     the next result to overwrite it, until the response is a final one. For the
     final one, print a newline to preserve the finalized transcription.
     """
+    global keyword_counts
 
     for response in responses:
-        f.seek(start_pos)
+
+        out_file.seek(start_pos)
 
         if get_current_time() - stream.start_time > STREAMING_LIMIT:
             stream.start_time = get_current_time()
@@ -208,6 +213,18 @@ def listen_print_loop(responses, stream, start_pos, f):
         # Display interim results, but with a carriage return at the end of the
         # line, so subsequent lines will overwrite them.
 
+
+        for keyword in keywords:
+            print("transcript count", transcript.count(keyword))
+            print("keyword", keyword_counts[keyword])
+            print(transcript)
+            if transcript.count(keyword) > keyword_counts[keyword]:
+                print("keyword found")
+                keyword_file.write(f"{keyword}\n")
+                keyword_file.flush()
+                keyword_counts[keyword] += 1
+
+
         if result.is_final:
 
             sys.stdout.write(GREEN)
@@ -219,9 +236,11 @@ def listen_print_loop(responses, stream, start_pos, f):
             stream.last_transcript_was_final = True
 
             # new line break and reset the start pos for the stream
-            f.write(f"{transcript}\n")
-            start_pos = f.tell()
+            out_file.write(f"{transcript}\n")
+            start_pos = out_file.tell()
+            out_file.flush()
 
+            keyword_counts = defaultdict(lambda: 0)
 
             # Exit recognition if any of the transcribed phrases could be
             # one of our keywords.
@@ -238,8 +257,16 @@ def listen_print_loop(responses, stream, start_pos, f):
             # sys.stdout.write(transcript + "\r")
 
             # write without a newline, don't reset start pos
-            f.seek(start_pos)
-            f.write(transcript)
+            out_file.seek(start_pos)
+            out_file.write(transcript)
+
+
+            # for keyword in keywords:
+            #     if keyword.lower() in transcript.lower():
+            #         if should_write_keyword:
+            #             keyword_file.write(f"{keyword}\n")
+            #             should_write_keyword = False
+            #             keyword_file.flush()
 
             stream.last_transcript_was_final = False
     
@@ -273,48 +300,53 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('output_file', type=str, default='speech.txt')
+    parser.add_argument('--keyword_file', type=str, default='keywords.txt')
+    parser.add_argument('--keywords', type=str, nargs='+', default=[])
+
 
     args = parser.parse_args()
     output_file = args.output_file
+    keyword_file = args.keyword_file 
+    keywords = args.keywords 
 
     with open(output_file, 'w') as f:
+        with open(keyword_file, 'w') as k:
+            with mic_manager as stream:
 
-        with mic_manager as stream:
+                while not stream.closed:
+                    sys.stdout.write(YELLOW)
+                    sys.stdout.write(
+                        "\n" + str(STREAMING_LIMIT * stream.restart_counter) + ": NEW REQUEST\n"
+                    )
 
-            while not stream.closed:
-                sys.stdout.write(YELLOW)
-                sys.stdout.write(
-                    "\n" + str(STREAMING_LIMIT * stream.restart_counter) + ": NEW REQUEST\n"
-                )
+                    stream.audio_input = []
+                    audio_generator = stream.generator()
 
-                stream.audio_input = []
-                audio_generator = stream.generator()
+                    requests = (
+                        speech.StreamingRecognizeRequest(audio_content=content)
+                        for content in audio_generator
+                    )
 
-                requests = (
-                    speech.StreamingRecognizeRequest(audio_content=content)
-                    for content in audio_generator
-                )
-
-                responses = client.streaming_recognize(streaming_config, requests)
-
-
-                start_pos = f.tell()
+                    responses = client.streaming_recognize(streaming_config, requests)
 
 
-                # Now, put the transcription responses to use.
-                listen_print_loop(responses, stream, start_pos, f)
+                    start_pos = f.tell()
 
-                if stream.result_end_time > 0:
-                    stream.final_request_end_time = stream.is_final_end_time
-                stream.result_end_time = 0
-                stream.last_audio_input = []
-                stream.last_audio_input = stream.audio_input
-                stream.audio_input = []
-                stream.restart_counter = stream.restart_counter + 1
 
-                if not stream.last_transcript_was_final:
-                    sys.stdout.write("\n")
-                stream.new_stream = True
+                    # Now, put the transcription responses to use.
+                    listen_print_loop(responses, stream, start_pos, f, k, keywords)
+
+                    if stream.result_end_time > 0:
+                        stream.final_request_end_time = stream.is_final_end_time
+                    stream.result_end_time = 0
+                    stream.last_audio_input = []
+                    stream.last_audio_input = stream.audio_input
+                    stream.audio_input = []
+                    stream.restart_counter = stream.restart_counter + 1
+
+                    if not stream.last_transcript_was_final:
+                        sys.stdout.write("\n")
+                    stream.new_stream = True
 
 
 if __name__ == "__main__":

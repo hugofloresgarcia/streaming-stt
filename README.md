@@ -26,8 +26,10 @@ pip install -e .
 
 To run the streaming STT service and stream the output to a file, run:
 ```bash
-python stt.py speech.txt
+python stt.py speech.txt --keywords apple banana
 ```
+
+New instances of the keywords will be written to `keywords.txt` as soon as they're found in the text. 
 
 To view the streaming STT service output in real time, run:
 ```bash
